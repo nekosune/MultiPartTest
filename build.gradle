@@ -58,48 +58,59 @@ if (configFile2.exists()){
 dependencies {
     compile name: 'ForgeMultipart', version: "${config.minecraft_version}-${config.FMP_version}", ext: 'jar'
 }
+// Finds and sets version data
+task buildInfo {
+    def cmd = "git rev-parse --short HEAD"
+    def proc = cmd.execute()
+    proc.waitFor()
+    if (proc.exitValue() == 0) {
+        ext.revision = proc.text.trim()
+    } else {
+        ext.revision = "GITBORK"
+    }
 
-version = "2.2b-81"
-group= "vazkii.tinkerer" // http://maven.apache.org/guides/mini/guide-naming-conventions.html
-archivesBaseName = "ThaumicTinkerer"
+    if (System.getenv().BUILD_NUMBER != null) {
+        ext.buildNum = System.getenv().BUILD_NUMBER
+    } else {
+        ext.buildNum = "DEV"
+    }
+}
+ext.artifact_version = 'NFG'
+if (System.getenv().ARTIFACT_VERSION == null && artifact_version_override == 'NotUsed') {
+    artifact_version = "${project.buildInfo.buildNum}.${project.buildInfo.revision}"
+}
+if (System.getenv().ARTIFACT_VERSION != null && artifact_version_override == 'NotUsed') {
+    artifact_version = "${system.getenv().ARTIFACT_VERSION}"
+}
+if (artifact_version_override != 'NotUsed') {
+    artifact_version = "${artifact_version_override}"
+}
+version = "${config.minecraft_version}-${artifact_version}"
 
 minecraft {
-	version = "1.6.4-9.11.1.964"
-	assetDir = "eclipse/assets"
-    replaceIn "common/AutoCrashReporter.java"
-
-    if (project.hasProperty("pass"))
-        replace "INSERTPASSWORDHERE", project.pass
-
+    version = config.minecraft_version + "-" + config.forge_version
+    assetDir = 'run/assets'
+    replace '${version}', project.version
 }
-
-dependencies {
-	compile files (
-		'TCDEOBF.jar',
-		'mods/Waila_Dev_1.4.4.zip',
-		'mods/CodeChickenCore-dev 0.9.0.7.jar',
-		'mods/1.6.4/CodeChickenLib-dev-1.6.4-1.0.0.45.jar',
-		'mods/1.6.4/ForgeMultipart-dev-1.6.4-1.0.0.219.jar',
-		'mods/NotEnoughItems-dev 1.6.1.5.jar',
-		'mods/EnderStorage-dev 1.4.3.5.jar'
-	)
-    compile 'javax.mail:mail:1.4'
-	compile "tconstruct:TConstruct:7a2abb:dev"
-	compile name: 'ForgeMultipart', version: "1.6.4-1.0.0.240", ext: 'jar'
+sourceSets {
+    main {
+        resources {
+            srcDir 'resources'
+        }
+    }
 }
-
 processResources
 {
-    // replace stuff in mcmod.info, nothing else
+    // Replace stuff in text files, not binaries.
     from(sourceSets.main.resources.srcDirs) {
-        include 'mcmod/info'
-                
-        // replace version and mcversion
-        expand 'version':project.version, 'mcversion':project.minecraft.version
+        include '**/*.info'
+        // Replace version and MCversion
+        expand 'version':artifact_version,'MCversion':config.minecraft_version
     }
         
-    // copy everything else, thats not the mcmod.info
+    // Copy everything else that's not text
     from(sourceSets.main.resources.srcDirs) {
-        exclude 'mcmod.info'
+        exclude '**/*.info'
     }
 }
+
